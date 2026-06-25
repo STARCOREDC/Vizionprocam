@@ -1,0 +1,31 @@
+# SEGREDOS — NUNCA commitar
+.env
+**/.env
+**/.env.*
+.dbenv
+**/.dbenv
+*.key
+*.pem
+secrets*
+MEMORY.md
+CLAUDE.md
+
+# app mobile vai no repo vizionprocam-app
+mobile/
+
+# dependências e builds
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+
+# runtime / dados / temporários
+*.log
+**/*.log
+*.bak
+**/*.bak*
+recordings/
+**/recordings/
+vizionpro-snaps/

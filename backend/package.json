@@ -1,0 +1,18 @@
+{
+  "name": "vizionpro-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "create-admin": "node scripts/create-admin.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@fastify/jwt": "^8.0.1",
+    "bcryptjs": "^2.4.3",
+    "fastify": "^4.28.1",
+    "onvif": "^0.8.1",
+    "pg": "^8.12.0"
+  }
+}
