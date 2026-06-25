@@ -149,15 +149,26 @@ async function tick() {
         if (st.online && st.misses >= 3) {
           // ~60s confirmando: primeira notificação de offline
           st.online = false
+          st.offlineCleared = false
           st.lastOfflineAlert = Date.now()
           await fireAlert(c, false)
         } else if (
           !st.online &&
           Date.now() - (st.lastOfflineAlert || 0) >= OFFLINE_REALERT_MS
         ) {
-          // continua offline: lembra o dono a cada 5 min (notificação no celular)
+          // continua offline: lembrete a cada 5 min — SÓ push (não cria novo
+          // alerta na tela, pra não acumular vários "offline" da mesma câmera)
           st.lastOfflineAlert = Date.now()
-          await fireAlert(c, false)
+          try {
+            const ids = (await usersForCamera(c.id)).map((u) => u.id)
+            sendPushToUsers(ids, {
+              title: '🔴 Câmera offline',
+              body: `A câmera "${c.name}" continua offline (sem sinal).`,
+              data: { type: 'camera', cameraId: c.id },
+            })
+          } catch {
+            // ignore
+          }
         }
       } else {
         if (!st.online) {
@@ -171,6 +182,19 @@ async function tick() {
               .then((t) => console.log(`[health] ${c.slug}: voltou ao preset home (token ${t})`))
               .catch(() => {})
           }, 10000)
+        }
+        // RESOLVIDO: a câmera está online -> remove os alertas de "Câmera
+        // offline" dela (o problema acabou). Roda 1x por câmera até cair de
+        // novo; limpa inclusive alertas órfãos (ex: backend reiniciou e perdeu
+        // o estado da queda, deixando o "offline" preso na tela).
+        if (!st.offlineCleared) {
+          await pool
+            .query(
+              `DELETE FROM alerts WHERE title = 'Câmera offline' AND message LIKE $1`,
+              [`%"${c.name}"%`]
+            )
+            .catch(() => {})
+          st.offlineCleared = true
         }
         st.misses = 0
       }

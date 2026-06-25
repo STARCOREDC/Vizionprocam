@@ -565,10 +565,19 @@ export default async function cameraRoutes(app) {
   })
 
   app.delete('/:id', admin, async (req) => {
-    const { rows } = await pool.query('DELETE FROM cameras WHERE id = $1 RETURNING slug', [
-      req.params.id,
-    ])
-    if (rows[0]) await removeCameraPath(rows[0].slug).catch(() => {})
+    const { rows } = await pool.query(
+      'DELETE FROM cameras WHERE id = $1 RETURNING slug, name',
+      [req.params.id]
+    )
+    if (rows[0]) {
+      await removeCameraPath(rows[0].slug).catch(() => {})
+      // O CASCADE do banco limpa events/outages/grupos/shares, mas a tabela
+      // `alerts` não tem camera_id (liga pelo nome) — então removemos aqui,
+      // senão fica alerta órfão da câmera que foi excluída.
+      await pool
+        .query(`DELETE FROM alerts WHERE message LIKE $1`, [`%"${rows[0].name}"%`])
+        .catch(() => {})
+    }
     return { ok: true }
   })
 
