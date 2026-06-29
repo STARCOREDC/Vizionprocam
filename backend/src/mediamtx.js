@@ -25,13 +25,26 @@ const RTSP_LOCAL = process.env.MEDIAMTX_RTSP || 'rtsp://localhost:8554'
 // - record: grava em disco com retenção de record_days dias
 function pathConfig(rtsp, transcode, record, recordDays) {
   const cfg = {}
+  // DVR Dahua/Intelbras (rtsp .../cam/realmonitor...) entrega um HEVC que o
+  // gravador/muxer do mediamtx não consegue empacotar ("invalid DeltaPocS0") —
+  // não grava nem transmite. Nesses casos recodificamos o vídeo pra H.264, que
+  // resolve gravação + ao vivo (e ainda toca em Android). Câmeras "limpas"
+  // (XM/iCSee) seguem com copy (leve, sem recodificar).
+  const recodeVideo = /realmonitor/i.test(String(rtsp)) && /subtype=0/.test(String(rtsp))
+  const vcodec = recodeVideo
+    ? '-c:v libx264 -preset veryfast -crf 24 -g 50 -pix_fmt yuv420p '
+    : '-c:v copy '
   const ffmpegCmd =
     // -stimeout: se a câmera cair, o ffmpeg detecta (5s sem dados), sai, e o
     // Mediamtx reinicia o comando (runOnInitRestart) -> reconecta sozinho ao voltar.
     `ffmpeg -rtsp_transport tcp -stimeout 5000000 -i ${rtsp} ` +
-    `-c:v copy ` +
+    vcodec +
     `-c:a aac -b:a 64k -ac 1 ` +
-    `-f rtsp ${RTSP_LOCAL}/$MTX_PATH`
+    // -rtsp_transport tcp na SAÍDA: a republicação ffmpeg->mediamtx via UDP
+    // perdia pacotes (RTP missing / fragmentação HEVC inválida), quebrando a
+    // gravação em centenas de micro-segmentos (timeline recortada, "pulando").
+    // TCP garante a entrega e mantém a gravação contínua.
+    `-rtsp_transport tcp -f rtsp ${RTSP_LOCAL}/$MTX_PATH`
   if (transcode) {
     if (record) {
       // grava 24/7: ffmpeg sempre rodando (runOnInit)
